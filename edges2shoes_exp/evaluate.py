@@ -150,8 +150,7 @@ def variational_ubo(model, real_A, real_B, steps, visualize=False, vis_name=None
     return ubo_val, kld_val, bpp
 
 def nats2bpp(nats, nc, npx):
-    bpp = (nats / (npx * npx * nc)) / np.log(2.)
-    return bpp
+    return (nats / (npx * npx * nc)) / np.log(2.)
 
 
 def visualize_data(opt, data, size, save_path):

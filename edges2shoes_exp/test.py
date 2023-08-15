@@ -334,7 +334,7 @@ def parse_opt_file(opt_path):
         if opt_path.endswith('pkl'):
             opt = pkl.load(f)
         else:
-            opt = dict()
+            opt = {}
             for line in f:
                 if line.startswith('-----'):
                     continue

@@ -33,8 +33,7 @@ class MergeModule(TwoInputModule):
 
     def forward(self, input1, input2):
         output1 = self.module1.forward(input1)
-        output2 = self.module2.forward(output1, input2)
-        return output2
+        return self.module2.forward(output1, input2)
 
 ######################################################################
 # A (sort of) hacky way to create a container that takes two inputs (e.g. x and z)
@@ -88,13 +87,11 @@ class InstanceNorm(nn.Module):
         std = torch.rsqrt((centered_x ** 2).mean(2, keepdim=True) + self.eps)
         norm_features = (centered_x * std).view(*size)
 
-        # broadcast on the batch dimension, hight and width dimensions
-        if self.affine:
-            output = norm_features * self.scale[:,None,None] + self.shift[:,None,None]
-        else:
-            output = norm_features
-
-        return output
+        return (
+            norm_features * self.scale[:, None, None] + self.shift[:, None, None]
+            if self.affine
+            else norm_features
+        )
 InstanceNorm2d = nn.InstanceNorm2d if USE_PYTORCH_IN else InstanceNorm
 
 ######################################################################
@@ -128,8 +125,7 @@ class CondInstanceNorm(TwoInputModule):
         var = x_reshaped.var(2, keepdim=True)
         std =  torch.rsqrt(var + self.eps)
         norm_features = ((x_reshaped - mean) * std).view(*size)
-        output = norm_features * scale + shift
-        return output
+        return norm_features * scale + shift
 
 
 ######################################################################
@@ -155,7 +151,7 @@ class CINResnetBlock(TwoInputModule):
         elif padding_type == 'zero':
             p = 1
         else:
-            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
+            raise NotImplementedError(f'padding [{padding_type}] is not implemented')
 
         conv_block += [
             MergeModule(
@@ -175,7 +171,7 @@ class CINResnetBlock(TwoInputModule):
         elif padding_type == 'zero':
             p = 1
         else:
-            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
+            raise NotImplementedError(f'padding [{padding_type}] is not implemented')
 
         conv_block += [nn.Conv2d(x_dim, x_dim, kernel_size=3, padding=p, bias=use_bias),
                        InstanceNorm2d(x_dim, affine=True)]
@@ -206,7 +202,7 @@ class ResnetBlock(nn.Module):
         elif padding_type == 'zero':
             p = 1
         else:
-            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
+            raise NotImplementedError(f'padding [{padding_type}] is not implemented')
 
         conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias)]
         conv_block += [nn.ReLU(True)]
@@ -222,7 +218,7 @@ class ResnetBlock(nn.Module):
         elif padding_type == 'zero':
             p = 1
         else:
-            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
+            raise NotImplementedError(f'padding [{padding_type}] is not implemented')
 
         conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias)]
         conv_block += [norm_layer(dim)]

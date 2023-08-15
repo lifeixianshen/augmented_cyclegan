@@ -10,15 +10,15 @@ parser.add_argument('--split', dest='split', help='train / val split', type=str,
 args = parser.parse_args()
 
 for arg in vars(args):
-    print('[%s] = ' % arg,  getattr(args, arg))
+    print(f'[{arg}] = ', getattr(args, arg))
 
 sp = args.split
 img_fold_AB = os.path.join(args.fold_AB, sp)
 img_list = os.listdir(img_fold_AB)
 num_imgs = len(img_list)
 print('split = %s, use %d/%d images' % (sp, num_imgs, len(img_list)))
-img_fold_A = os.path.join(args.fold_AB, sp+"A")
-img_fold_B = os.path.join(args.fold_AB, sp+"B")
+img_fold_A = os.path.join(args.fold_AB, f"{sp}A")
+img_fold_B = os.path.join(args.fold_AB, f"{sp}B")
 if not os.path.isdir(img_fold_A):
     os.makedirs(img_fold_A)
 if not os.path.isdir(img_fold_B):

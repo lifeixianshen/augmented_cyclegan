@@ -153,7 +153,7 @@ class Edges2Shoes(object):
             self.dir_A = os.path.join(self.root, 'valA')
             self.dir_B = os.path.join(self.root, 'valB')
         else:
-            raise NotImplementedError('subset %s no supported' % subset)
+            raise NotImplementedError(f'subset {subset} no supported')
 
         self.A_paths = sorted(make_dataset(self.dir_A))
         self.B_paths = sorted(make_dataset(self.dir_B))
@@ -258,7 +258,7 @@ def is_image_file(filename):
 
 def make_dataset(dir):
     images = []
-    assert os.path.isdir(dir), '%s is not a valid directory' % dir
+    assert os.path.isdir(dir), f'{dir} is not a valid directory'
 
     for root, _, fnames in sorted(os.walk(dir)):
         for fname in fnames:

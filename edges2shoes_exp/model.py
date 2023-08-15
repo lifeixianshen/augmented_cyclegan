@@ -49,27 +49,24 @@ def kld_std_guss(mu, log_var):
     https://arxiv.org/abs/1312.6114
     KL = -0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
     """
-    kld = -0.5 * torch.sum(log_var + 1. - mu**2 - torch.exp(log_var), dim=1)
-    return kld
+    return -0.5 * torch.sum(log_var + 1. - mu**2 - torch.exp(log_var), dim=1)
 
 
 def criterion_GAN(pred, target_is_real, use_sigmoid=True):
     if use_sigmoid:
-        if target_is_real:
-            target_var = Variable(pred.data.new(pred.size()).long().fill_(1.))
-        else:
-            target_var = Variable(pred.data.new(pred.size()).long().fill_(0.))
-
-        loss = F.binary_cross_entropy(pred, target_var)
+        target_var = (
+            Variable(pred.data.new(pred.size()).long().fill_(1.0))
+            if target_is_real
+            else Variable(pred.data.new(pred.size()).long().fill_(0.0))
+        )
+        return F.binary_cross_entropy(pred, target_var)
     else:
         if target_is_real:
             target_var = Variable(pred.data.new(pred.size()).fill_(1.))
         else:
             target_var = Variable(pred.data.new(pred.size()).fill_(0.))
 
-        loss = F.mse_loss(pred, target_var)
-
-    return loss
+        return F.mse_loss(pred, target_var)
 
 
 class StochCycleGAN(object):
@@ -117,7 +114,7 @@ class StochCycleGAN(object):
         self.criterionCycle = F.l1_loss
 
         if not testing:
-            with open("%s/nets.txt" % opt.expr_dir, 'w') as nets_f:
+            with open(f"{opt.expr_dir}/nets.txt", 'w') as nets_f:
                 networks.print_network(self.netG_A_B, nets_f)
                 networks.print_network(self.netG_B_A, nets_f)
                 networks.print_network(self.netD_A, nets_f)
@@ -215,14 +212,21 @@ class StochCycleGAN(object):
         fake_A = self.netG_B_A.forward(real_B)
         rec_A = self.netG_B_A.forward(fake_B)
         rec_B = self.netG_A_B.forward(fake_A, prior_z_B)
-        visuals = OrderedDict([('real_A', real_A.data), ('fake_B', fake_B.data), ('rec_A', rec_A.data),
-                               ('real_B', real_B.data), ('fake_A', fake_A.data), ('rec_B', rec_B.data)])
-        return visuals
+        return OrderedDict(
+            [
+                ('real_A', real_A.data),
+                ('fake_B', fake_B.data),
+                ('rec_A', rec_A.data),
+                ('real_B', real_B.data),
+                ('fake_A', fake_A.data),
+                ('rec_B', rec_B.data),
+            ]
+        )
 
     def generate_multi_cycle(self, real_B, steps):
         images = [real_B.data]
         B = real_B
-        for i in range(steps):
+        for _ in range(steps):
             A = self.netG_B_A.forward(B)
             z_B = Variable(real_B.data.new(real_B.size(0), self.opt.nlatent, 1, 1).normal_(0, 1),
                            volatile=True)
@@ -254,8 +258,7 @@ class StochCycleGAN(object):
         noisy_fake_A = fake_A + Variable(fake_A.data.new(*fake_A.size()).normal_(0, noise_std),
                                          volatile=True)
         noisy_fake_A = torch.clamp(noisy_fake_A, -1, 1)
-        rec_B = self.netG_A_B.forward(noisy_fake_A, z_B)
-        return rec_B
+        return self.netG_A_B.forward(noisy_fake_A, z_B)
 
     def predict_A(self, real_B):
         return self.netG_B_A.forward(real_B)
@@ -275,9 +278,7 @@ class StochCycleGAN(object):
         multi_real_A = real_A.unsqueeze(1).repeat(1, num, 1, 1, 1)
         multi_real_A = multi_real_A.view(size[0]*num,size[1],size[2],size[3])
 
-        multi_fake_B = self.netG_A_B.forward(multi_real_A, multi_prior_z_B)
-
-        return multi_fake_B
+        return self.netG_A_B.forward(multi_real_A, multi_prior_z_B)
 
     def update_learning_rate(self):
         lrd = self.opt.lr / self.opt.niter_decay
@@ -391,7 +392,7 @@ class AugmentedCycleGAN(object):
         self.criterionCycle = F.l1_loss
 
         if not testing:
-            with open("%s/nets.txt" % opt.expr_dir, 'w') as nets_f:
+            with open(f"{opt.expr_dir}/nets.txt", 'w') as nets_f:
                 networks.print_network(self.netG_A_B, nets_f)
                 networks.print_network(self.netG_B_A, nets_f)
                 networks.print_network(self.netD_A, nets_f)
@@ -553,7 +554,7 @@ class AugmentedCycleGAN(object):
             logvar = logvar * 0.0
 
         loss_D_post_z_B, loss_D_prior_z_B, pred_post_z_B, pred_prior_z_B = \
-                discriminate(self.netD_z_B, self.criterionGAN, post_z_B.detach(), prior_z_B)
+                    discriminate(self.netD_z_B, self.criterionGAN, post_z_B.detach(), prior_z_B)
         loss_D_z_B = 0.5 * (loss_D_post_z_B + loss_D_prior_z_B)
 
         self.optimizer_D_B.zero_grad()
@@ -592,16 +593,18 @@ class AugmentedCycleGAN(object):
         self.optimizer_G_A.step()
         self.optimizer_G_B.step()
 
-        ##### Return dicts
-        losses  = OrderedDict([('S_A', loss_sup_A.data[0]), ('S_B', loss_sup_B.data[0]),
-                               ('KLD_z_B', kld_z_B.data[0]),
-                               ('D_z_B', loss_D_z_B.data[0]),
-                               ('gnorm_G_A_B', gnorm_G_A_B),
-                               ('gnorm_G_B_A', gnorm_G_B_A),
-                               ('gnorm_E_B', gnorm_E_B),
-                               ('gnorm_D_z_B', gnorm_D_z_B),])
-
-        return losses
+        return OrderedDict(
+            [
+                ('S_A', loss_sup_A.data[0]),
+                ('S_B', loss_sup_B.data[0]),
+                ('KLD_z_B', kld_z_B.data[0]),
+                ('D_z_B', loss_D_z_B.data[0]),
+                ('gnorm_G_A_B', gnorm_G_A_B),
+                ('gnorm_G_B_A', gnorm_G_B_A),
+                ('gnorm_E_B', gnorm_E_B),
+                ('gnorm_D_z_B', gnorm_D_z_B),
+            ]
+        )
 
     def generate_cycle(self, real_A, real_B, prior_z_B):
         fake_B = self.netG_A_B.forward(real_A, prior_z_B)
@@ -619,9 +622,16 @@ class AugmentedCycleGAN(object):
             post_z_realB = mu_z_realB.view(mu_z_realB.size(0), mu_z_realB.size(1), 1, 1)
 
         rec_B = self.netG_A_B.forward(fake_A, post_z_realB)
-        visuals = OrderedDict([('real_A', real_A.data), ('fake_B', fake_B.data), ('rec_A', rec_A.data),
-                               ('real_B', real_B.data), ('fake_A', fake_A.data), ('rec_B', rec_B.data)])
-        return visuals
+        return OrderedDict(
+            [
+                ('real_A', real_A.data),
+                ('fake_B', fake_B.data),
+                ('rec_A', rec_A.data),
+                ('real_B', real_B.data),
+                ('fake_A', fake_A.data),
+                ('rec_B', rec_B.data),
+            ]
+        )
 
     def generate_noisy_cycle(self, real_B, std):
         fake_A = self.netG_B_A.forward(real_B)
@@ -640,9 +650,7 @@ class AugmentedCycleGAN(object):
         else:
             post_z_realB = mu_z_realB.view(mu_z_realB.size(0), mu_z_realB.size(1), 1, 1)
 
-        rec_B = self.netG_A_B.forward(noisy_fake_A, post_z_realB)
-
-        return rec_B
+        return self.netG_A_B.forward(noisy_fake_A, post_z_realB)
 
     def predict_A(self, real_B):
         return self.netG_B_A.forward(real_B)
@@ -656,15 +664,12 @@ class AugmentedCycleGAN(object):
             mu, logvar = self.netE_B.forward(concat_B_A)
         else:
             mu, logvar = self.netE_B.forward(real_B)
-        if self.opt.stoch_enc:
-            return mu, logvar
-        else:
-            return (mu,)
+        return (mu, logvar) if self.opt.stoch_enc else (mu, )
 
     def generate_multi_cycle(self, real_B, steps, from_prior=True):
         images = [real_B.data]
         B = real_B
-        for i in range(steps):
+        for _ in range(steps):
             A = self.netG_B_A.forward(B)
             if from_prior:
                 z_B = Variable(real_B.data.new(real_B.size(0), self.opt.nlatent, 1, 1).normal_(0, 1),
@@ -676,10 +681,11 @@ class AugmentedCycleGAN(object):
                 else:
                     mu_z_B, logvar_z_B = self.netE_B.forward(B)
 
-                if self.opt.stoch_enc:
-                    z_B = gauss_reparametrize(mu_z_B, logvar_z_B)
-                else:
-                    z_B = mu_z_B.view(mu_z_B.size(0), mu_z_B.size(1), 1, 1)
+                z_B = (
+                    gauss_reparametrize(mu_z_B, logvar_z_B)
+                    if self.opt.stoch_enc
+                    else mu_z_B.view(mu_z_B.size(0), mu_z_B.size(1), 1, 1)
+                )
             B = self.netG_A_B.forward(A, z_B)
             images.extend([A.data, B.data])
         return images
@@ -691,9 +697,7 @@ class AugmentedCycleGAN(object):
         multi_real_A = real_A.unsqueeze(1).repeat(1, num, 1, 1, 1)
         multi_real_A = multi_real_A.view(size[0]*num,size[1],size[2],size[3])
 
-        multi_fake_B = self.netG_A_B.forward(multi_real_A, multi_prior_z_B)
-
-        return multi_fake_B
+        return self.netG_A_B.forward(multi_real_A, multi_prior_z_B)
 
     def generate_cycle_B_multi(self, real_B, multi_prior_z_B):
         fake_A = self.netG_B_A.forward(real_B)
@@ -728,9 +732,7 @@ class AugmentedCycleGAN(object):
 
         multi_post_z_B = Variable(post_z_B.data.repeat(size[0],1,1,1), volatile=True)
 
-        multi_fake_B = self.netG_A_B.forward(multi_real_A, multi_post_z_B)
-
-        return multi_fake_B
+        return self.netG_A_B.forward(multi_real_A, multi_post_z_B)
 
     def update_learning_rate(self):
         lrd = self.opt.lr / self.opt.niter_decay

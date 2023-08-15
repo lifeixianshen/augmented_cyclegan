@@ -28,7 +28,7 @@ def save_results(expr_dir, results_dict):
 
 def copy_scripts_to_folder(expr_dir):
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    for f in glob.glob("%s/*.py" % dir_path):
+    for f in glob.glob(f"{dir_path}/*.py"):
         shutil.copy(f, expr_dir)
 
 def print_log(out_f, message):
@@ -49,10 +49,7 @@ def visualize_cycle(opt, real_A, visuals, eidx, uidx, train):
 
     images = [img.cpu().unsqueeze(1) for img in visuals.values()]
     vis_image = torch.cat(images, dim=1).view(size[0]*len(images),size[1],size[2],size[3])
-    if train:
-        save_path = opt.train_vis_cycle
-    else:
-        save_path = opt.vis_cycle
+    save_path = opt.train_vis_cycle if train else opt.vis_cycle
     save_path = os.path.join(save_path, 'cycle_%02d_%04d.png' % (eidx, uidx))
     vutils.save_image(vis_image.cpu(), save_path,
         normalize=True, range=(-1,1), nrow=len(images))

@@ -26,7 +26,7 @@ def get_norm_layer(norm_type='instance'):
     elif norm_type == 'instance':
         norm_layer = functools.partial(InstanceNorm2d, affine=True)
     else:
-        raise NotImplementedError('normalization layer [%s] is not found' % norm_type)
+        raise NotImplementedError(f'normalization layer [{norm_type}] is not found')
     return norm_layer
 
 
@@ -128,9 +128,7 @@ def define_E(nlatent, input_nc, nef, norm='batch', gpu_ids=[]):
 
 
 def print_network(net, out_f=None):
-    num_params = 0
-    for param in net.parameters():
-        num_params += param.numel()
+    num_params = sum(param.numel() for param in net.parameters())
     # print(net)
     if out_f is not None:
         out_f.write(net.__repr__()+"\n")
@@ -169,8 +167,8 @@ class CINResnetGenerator(nn.Module):
             norm_layer(4*ngf, nlatent),
             nn.ReLU(True)
         ]
-        
-        for i in range(3):
+
+        for _ in range(3):
             model += [CINResnetBlock(x_dim=4*ngf, z_dim=nlatent, padding_type=padding_type,
                                      norm_layer=norm_layer, use_dropout=use_dropout, use_bias=True)]
 
@@ -222,7 +220,7 @@ class ResnetGenerator(nn.Module):
             nn.ReLU(True),
         ]
 
-        for i in range(3):
+        for _ in range(3):
             model += [ResnetBlock(4*ngf, padding_type=padding_type, norm_layer=norm_layer,
                                   use_dropout=use_dropout, use_bias=True)]
 

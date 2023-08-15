@@ -96,7 +96,7 @@ class TrainOptions(object):
                 self.opt.gpu_ids.append(id)
 
         # Set gpu ids
-        if len(self.opt.gpu_ids) > 0:
+        if self.opt.gpu_ids:
             torch.cuda.set_device(self.opt.gpu_ids[0])
 
         # save to the disk
@@ -107,7 +107,7 @@ class TrainOptions(object):
 
         print('------------ Options -------------')
         for k, v in sorted(args.items()):
-            print('%s: %s' % (str(k), str(v)))
+            print(f'{str(k)}: {str(v)}')
         print('-------------- End ----------------')
         if not os.path.exists(expr_dir):
             os.makedirs(expr_dir)
